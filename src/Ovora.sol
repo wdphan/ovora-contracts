@@ -6,7 +6,7 @@ pragma solidity ^0.8.11;
 // this lottery contract will contain 50 NFTs up for lottery
 // NFTs were minted by Minter.sol and transfer to this contract
 
-import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
+import "node_modules/@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "./Minter.sol";
 
 contract Ovora is VRFConsumerBase {
