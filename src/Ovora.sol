@@ -1,52 +1,32 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.11;
+// theoretically, you can predict the random number with this contract
+// because the pseudo-random number is public available data
+// winner get the NFT
+// the owner of the contrcat gets the funds
 
-// lottery contract with random number functionality from Chainlink
-// this lottery contract will contain 50 NFTs up for lottery
-// NFTs were minted by Minter.sol and transfer to this contract
-
-import "node_modules/@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "./Minter.sol";
 
-contract Ovora is VRFConsumerBase {
-    address public owner;
+pragma solidity ^0.8.11;
+
+contract Lottery is Minter {
+    address payable public owner;
     address payable[] public players;
     uint public lotteryId;
+    // maps the ID to the lottery address
     mapping (uint => address payable) public lotteryHistory;
 
-    bytes32 internal keyHash; // identifies which Chainlink oracle to use
-    uint internal fee;        // fee to get random number
-    uint public randomResult;
-
-    constructor()
-        VRFConsumerBase(
-            0x2Ca8E0C643bDe4C2E08ab1fA0da3401AdAD7734D, // VRF coordinator
-            0x326C977E6efc84E512bB9C30f76E30c160eD06FB  // LINK token address
-        ) {
-            keyHash = 0x79d3d8832d904592c0bf9818b621522c988bb8b0c05cdc3b15aea1b6e8db0c15;
-            fee = 0.1 * 10 ** 18;    // 0.1 LINK
-
-            owner = msg.sender;
-            lotteryId = 1;
-        }
-        
-
-    function getRandomNumber() public returns (bytes32 requestId) {
-        require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK in contract");
-        return requestRandomness(keyHash, fee);
-    }
-
-    function fulfillRandomness(bytes32 requestId, uint randomness) internal override {
-        randomResult = randomness;
-        payWinner();
+    // first lottery has an ID of 1
+    constructor() {
+        owner = payable(msg.sender);
+        lotteryId = 1;
     }
 
     function getWinnerByLottery(uint lottery) public view returns (address payable) {
         return lotteryHistory[lottery];
     }
 
-    // for admin to see how much paid to protocol
+    // gets the balance of the lottery contract
     function getBalance() public view returns (uint) {
         return address(this).balance;
     }
@@ -55,6 +35,7 @@ contract Ovora is VRFConsumerBase {
         return players;
     }
 
+    // must pay > .01 ether to enter raffle
     function enter() public payable {
         require(msg.value > .01 ether);
 
@@ -62,18 +43,26 @@ contract Ovora is VRFConsumerBase {
         players.push(payable(msg.sender));
     }
 
-    function pickWinner() public onlyowner {
-        getRandomNumber();
+    function getRandomNumber() public view returns (uint) {
+        return uint(keccak256(abi.encodePacked(owner, block.timestamp)));
     }
 
+    // transfer the winner the NFT and transfer the contract funds to the owner
+    function pickWinner() public payable onlyowner {
+        // gives us a random number between zero and the length of
+        // array - 1
+        uint index = getRandomNumber() % players.length;
+        address winner = players[index]; 
 
-    // would use safetransfer to transfer protocol NFTs
-    // to winner
-    function payWinner() public {
-        uint index = randomResult % players.length;
-        players[index].transfer(address(this).balance);
+        // transfer the NFT balance from the owner to the winner
+        ERC721A.safeTransferFrom(owner, winner, 0);
 
+        // transfers the Contract ERC20 balance to the owner
+        owner.transfer(address(this).balance);
+
+        // lottery ID is set to the address of the winner
         lotteryHistory[lotteryId] = players[index];
+        // increases the lottery ID
         lotteryId++;
         
         // reset the state of the contract
