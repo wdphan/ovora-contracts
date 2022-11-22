@@ -1,4 +1,4 @@
-# NFT Lotto Implementation
+# NFT Lotto Implementation - Ovora
 
 > A lottery that requires funds to participate
 
